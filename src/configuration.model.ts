@@ -59,6 +59,28 @@ class EsploraConfig {
     url: string;
 }
 
+export class BitcoinCoreConfig {
+    @IsNotEmpty()
+    @IsString()
+    rpchost: string;
+
+    @IsNotEmpty()
+    @IsString()
+    rpcpass: string;
+
+    @IsNotEmpty()
+    @IsString()
+    network: string;
+
+    @IsNotEmpty()
+    @IsString()
+    rpcuser: string;
+
+    @IsNotEmpty()
+    @IsString()
+    rpcport: string;
+}
+
 export class Config {
     @IsDefined()
     @ValidateNested()
@@ -78,4 +100,8 @@ export class Config {
     @ValidateNested()
     @Type(() => EsploraConfig)
     esplora: EsploraConfig;
+
+    @ValidateNested()
+    @Type(() => BitcoinCoreConfig)
+    bitcoincore: BitcoinCoreConfig;
 }
