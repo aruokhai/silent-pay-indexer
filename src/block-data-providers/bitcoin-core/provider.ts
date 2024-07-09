@@ -2,13 +2,6 @@ import { ConfigService } from '@nestjs/config';
 import * as Client from 'bitcoin-core';
 import { BitcoinCoreConfig } from '@/configuration.model';
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import {
-    Block,
-    BlockTransaction,
-    Input,
-    isCoinbaseInput,
-    Output,
-} from '@/block-data-providers/bitcoin-core/interfaces';
 import { BitcoinNetwork } from '@/common/enum';
 import { TAPROOT_ACTIVATION_HEIGHT } from '@/common/constants';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -19,19 +12,15 @@ import {
 } from '@/indexer/indexer.service';
 import { OperationStateService } from '@/operation-state/operation-state.service';
 import { BaseBlockDataProvider } from '@/block-data-providers/base-block-data-provider.abstract';
-
-type BitcoinCoreOperationState = {
-    currentBlockHeight: number;
-    indexedBlockHeight: number;
-};
-
-type Transaction = {
-    txid: string;
-    vin: TransactionInput[];
-    vout: TransactionOutput[];
-    blockHeight: number;
-    blockHash: string;
-};
+import {
+    Block,
+    BitcoinCoreOperationState,
+    BlockTransaction,
+    Transaction,
+    Input,
+    isCoinbaseInput,
+    Output,
+} from '@/block-data-providers/bitcoin-core/interfaces';
 
 @Injectable()
 export class BitcoinCoreProvider
@@ -40,10 +29,7 @@ export class BitcoinCoreProvider
 {
     protected readonly logger = new Logger(BitcoinCoreProvider.name);
     protected readonly operationStateKey = 'bitcoincore-operation-state';
-    private readonly baseUrl: string;
     private isSyncing = false;
-    public START_BLOCK = 0;
-    private config: BitcoinCoreConfig;
 
     public client: Client;
 
@@ -53,13 +39,29 @@ export class BitcoinCoreProvider
         operationStateService: OperationStateService,
     ) {
         super(indexerService, operationStateService);
-        const config = this.configService.get<BitcoinCoreConfig>('bitcoincore');
+        this.initializeClient();
+    }
+
+    initializeClient() {
+        let network: string;
+        switch (this.configService.get<BitcoinNetwork>('app.network')) {
+            case BitcoinNetwork.TESTNET:
+                network = 'testnet';
+                break;
+            case BitcoinNetwork.REGTEST:
+                network = 'regtest';
+                break;
+            case BitcoinNetwork.MAINNET:
+            default:
+                network = 'mainnet';
+        }
+        const config = this.configService.get<BitcoinCoreConfig>('bitcoinCore');
         this.client = new Client({
-            network: config.network,
-            host: config.rpchost,
-            password: config.rpcpass,
-            port: config.rpcport,
-            username: config.rpcuser,
+            network,
+            host: config.rpcHost,
+            password: config.rpcPass,
+            port: config.rpcPort,
+            username: config.rpcUser,
         });
     }
 
@@ -94,53 +96,92 @@ export class BitcoinCoreProvider
         if (!state) {
             throw new Error('State not found');
         }
-
         const tipHeight = await this.getTipHeight();
         if (tipHeight <= state.indexedBlockHeight) {
-            this.logger.log(
+            this.logger.debug(
                 `No new blocks found. Current tip height: ${tipHeight}`,
             );
             this.isSyncing = false;
             return;
         }
 
-        const height = state.indexedBlockHeight + 1;
-        const transactions = await this.getTransactions(height);
-        state.indexedBlockHeight = height;
-        this.isSyncing = false;
-        for (const transaction of transactions) {
-            const { txid, vin, vout, blockHeight, blockHash } = transaction;
-            await this.indexTransaction(
-                txid,
-                vin,
-                vout,
-                blockHeight,
-                blockHash,
-            );
+        let height = state.indexedBlockHeight + 1;
+
+        for (height; height <= tipHeight; height++) {
+            const transactions = await this.processBlock(height);
+            for (const transaction of transactions) {
+                const { txid, vin, vout, blockHeight, blockHash } = transaction;
+                await this.indexTransaction(
+                    txid,
+                    vin,
+                    vout,
+                    blockHeight,
+                    blockHash,
+                );
+            }
+            state.indexedBlockHeight = height;
+            await this.setState(state);
         }
-        await this.setState(state);
+        this.isSyncing = false;
     }
 
     protected async getTipHeight(): Promise<number> {
-        return await this.client.getBlockCount();
+        try {
+            return await this.client.getBlockCount();
+        } catch (error) {
+            this.logger.log(`Error fetching block count`);
+            throw error;
+        }
     }
 
-    private async getTransactions(height: number): Promise<Transaction[]> {
-        const latestBlock = await this.getTipHeight();
-        const paredTransactionList: Transaction[] = [];
-        for (let i = height; i <= latestBlock; i++) {
-            const blockHash: string = await this.client.getBlockHash(i);
-            const block: Block = await this.client.getBlock(blockHash, 2);
-            for (const txn of block.tx) {
-                const parsedTransaction = await this.parseTransaction(
-                    txn,
-                    block.hash,
-                    block.height,
-                );
-                paredTransactionList.push(parsedTransaction);
-            }
+    protected async getBlockHash(height: number): Promise<string> {
+        try {
+            return await this.client.getBlockHash(height);
+        } catch (error) {
+            this.logger.log(`Error fetching  block hash of height : ${height}`);
+            throw error;
         }
-        return paredTransactionList;
+    }
+
+    protected async getBlock(hash: string, verbosity: number): Promise<Block> {
+        try {
+            return await this.client.getBlock(hash, verbosity);
+        } catch (error) {
+            this.logger.log(`Error fetching block with block hash : ${hash}`);
+            throw error;
+        }
+    }
+
+    protected async getRawTransaction(
+        txid: string,
+        isVerbose: boolean,
+    ): Promise<BlockTransaction> {
+        try {
+            return await this.client.getRawTransaction(txid, isVerbose);
+        } catch (error) {
+            this.logger.log(
+                `Error fetching transaction with transaction id : ${txid}`,
+            );
+            throw error;
+        }
+    }
+
+    public async processBlock(height: number): Promise<Transaction[]> {
+        const parsedTransactionList: Transaction[] = [];
+        const blockHash = await this.getBlockHash(height);
+        this.logger.log(
+            `Processing block at height ${height}, hash ${blockHash}`,
+        );
+        const block = await this.getBlock(blockHash, 2);
+        for (const txn of block.tx) {
+            const parsedTransaction = await this.parseTransaction(
+                txn,
+                block.hash,
+                block.height,
+            );
+            parsedTransactionList.push(parsedTransaction);
+        }
+        return parsedTransactionList;
     }
 
     private async parseTransaction(
@@ -178,8 +219,10 @@ export class BitcoinCoreProvider
 
         if (!isCoinbaseInput(txnInput)) {
             txid = txnInput.txid;
-            const prevTransaction: BlockTransaction =
-                await this.client.getRawTransaction(txnInput.txid, true);
+            const prevTransaction = await this.getRawTransaction(
+                txnInput.txid,
+                true,
+            );
             vout = txnInput.vout;
             prevOutScript = prevTransaction.vout.find((out) => out.n == vout)
                 .scriptPubKey.hex;

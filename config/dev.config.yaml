@@ -7,7 +7,12 @@ db:
   synchronize: true
 app:
   port: 3000
-  network: main
+  network: regtest
 providerType: ESPLORA
 esplora:
   url: https://blockstream.info
+bitcoinCore:
+  rpcHost: 127.0.0.1
+  rpcPass: polarpass
+  rpcUser: polaruser
+  rpcPort: 18445

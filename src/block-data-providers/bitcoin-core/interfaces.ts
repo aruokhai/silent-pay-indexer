@@ -1,3 +1,5 @@
+import { TransactionInput, TransactionOutput } from '@/indexer/indexer.service';
+
 export interface Block {
     height: number;
     hash: string;
@@ -38,3 +40,16 @@ export interface Output {
         hex: string;
     };
 }
+
+export type BitcoinCoreOperationState = {
+    currentBlockHeight: number;
+    indexedBlockHeight: number;
+};
+
+export type Transaction = {
+    txid: string;
+    vin: TransactionInput[];
+    vout: TransactionOutput[];
+    blockHeight: number;
+    blockHash: string;
+};

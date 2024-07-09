@@ -62,23 +62,19 @@ class EsploraConfig {
 export class BitcoinCoreConfig {
     @IsNotEmpty()
     @IsString()
-    rpchost: string;
+    rpcHost: string;
 
     @IsNotEmpty()
     @IsString()
-    rpcpass: string;
+    rpcPass: string;
 
     @IsNotEmpty()
     @IsString()
-    network: string;
+    rpcUser: string;
 
     @IsNotEmpty()
     @IsString()
-    rpcuser: string;
-
-    @IsNotEmpty()
-    @IsString()
-    rpcport: string;
+    rpcPort: string;
 }
 
 export class Config {
@@ -101,7 +97,9 @@ export class Config {
     @Type(() => EsploraConfig)
     esplora: EsploraConfig;
 
+    @ValidateIf((o) => o.providerType === ProviderType.BITCOIN_CORE_RPC)
+    @IsDefined()
     @ValidateNested()
     @Type(() => BitcoinCoreConfig)
-    bitcoincore: BitcoinCoreConfig;
+    bitcoinCore: BitcoinCoreConfig;
 }

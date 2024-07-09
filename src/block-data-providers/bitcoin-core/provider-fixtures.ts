@@ -1,9 +1,8 @@
 export const bitcoinCoreConfig = {
-    network: 'regtest',
-    rpchost: 'dummyhost',
-    rpcpass: 'dummypass',
-    rpcport: 'dummyport',
-    rpcuser: 'dummyuser',
+    rpcHost: 'dummyhost',
+    rpcPass: 'dummypass',
+    rpcPort: 'dummyport',
+    rpcUser: 'dummyuser',
 };
 
 export const blockCountToHash = new Map([

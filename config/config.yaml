@@ -11,3 +11,8 @@ app:
 providerType: <providerType>
 esplora:
   url: <host>
+bitcoinCore:
+  rpcHost: <host>
+  rpcPass: <password>
+  rpcUser: <username>
+  rpcPort: <port>
