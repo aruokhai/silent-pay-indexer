@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { OperationStateService } from '@/operation-state/operation-state.service';
 import { BaseBlockDataProvider } from '@/block-data-providers/base-block-data-provider.abstract';
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
+import axiosRetry from 'axios-retry';
 import { TAPROOT_ACTIVATION_HEIGHT } from '@/common/constants';
 import { ConfigService } from '@nestjs/config';
 import { BitcoinNetwork } from '@/common/enum';
@@ -88,6 +89,46 @@ export class EsploraProvider
         this.baseUrl = new URL(
             `${this.configService.get<string>('esplora.url')}${pathPrefix}`,
         ).toString();
+
+        const esploraRetryCount =
+            this.configService.get<number>('esplora.retryCount');
+        this.initiateRetryLogic(esploraRetryCount);
+    }
+
+    initiateRetryLogic(retryCount: number) {
+        const axiosStatus = (error: AxiosError) => error.status || error.code;
+        const axiosResponse = (error: AxiosError) =>
+            error.response?.data || error.message;
+        const maxRetryExceededLogger = (
+            error: AxiosError,
+            retryCount: number,
+        ) => {
+            this.logger.error(
+                `Request to Esplora failed! after ${retryCount} number of retries\n` +
+                    `Status code ${axiosStatus(error)}\n` +
+                    `Response:${JSON.stringify(axiosResponse(error))}`,
+            );
+        };
+        const onRetryLog = (
+            retryCount: number,
+            error: AxiosError,
+            requestConfig: AxiosRequestConfig,
+        ) => {
+            this.logger.error(
+                `Retrying Request to Esplora with retry count: ${retryCount}\n` +
+                    `Status code: ${axiosStatus(error)}\n` +
+                    `Request:${JSON.stringify({
+                        method: requestConfig.method,
+                        url: requestConfig.url,
+                    })}`,
+            );
+        };
+        axiosRetry(axios, {
+            retries: retryCount,
+            retryDelay: axiosRetry.exponentialDelay,
+            onMaxRetryTimesExceeded: maxRetryExceededLogger,
+            onRetry: onRetryLog,
+        });
     }
 
     async onApplicationBootstrap() {
@@ -197,23 +238,6 @@ export class EsploraProvider
             return response.data;
         } catch (error) {
             this.logger.error(error);
-            if (error instanceof AxiosError) {
-                if (error.response) {
-                    this.logger.error(
-                        `Request to Esplora failed!\nStatus code ${
-                            error.response.status
-                        }\nRequest:\n${JSON.stringify(
-                            config,
-                        )}\nResponse:\n${JSON.stringify(error.response.data)}`,
-                    );
-                }
-            } else {
-                this.logger.error(
-                    `Request to Esplora failed!\nRequest:\n${JSON.stringify(
-                        config,
-                    )}\nError:\n${error.message}`,
-                );
-            }
         }
     }
 

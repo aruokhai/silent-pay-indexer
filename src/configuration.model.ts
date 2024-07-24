@@ -57,6 +57,9 @@ class EsploraConfig {
         require_host: true,
     })
     url: string;
+    @IsInt()
+    @Min(1)
+    retryCount: number;
 }
 
 export class Config {
