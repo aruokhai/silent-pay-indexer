@@ -14,21 +14,6 @@ import {
 describe('Bitcoincore Provider', () => {
     let provider: BitcoinCoreProvider;
 
-    const BitcoinCoreClient = {
-        getBlockCount: () => {
-            return 3;
-        },
-        getBlockHash: (height: number) => {
-            return blockCountToHash.get(height);
-        },
-        getBlock: (hash: string) => {
-            return blocks.get(hash);
-        },
-        getRawTransaction: (hash: string) => {
-            return rawTransactions.get(hash);
-        },
-    };
-
     beforeEach(async () => {
         const fakeConfigService = {
             get: (key: string) => {
@@ -46,7 +31,23 @@ describe('Bitcoincore Provider', () => {
             {} as unknown as IndexerService,
             {} as unknown as OperationStateService,
         );
-        provider.client = BitcoinCoreClient;
+
+        jest.spyOn(provider, 'getTipHeight').mockImplementation(() => {
+            return Promise.resolve(3);
+        });
+        jest.spyOn(provider, 'getBlockHash').mockImplementation(
+            (height: number) => {
+                return Promise.resolve(blockCountToHash.get(height));
+            },
+        );
+        jest.spyOn(provider, 'getBlock').mockImplementation((hash: string) => {
+            return Promise.resolve(blocks.get(hash));
+        });
+        jest.spyOn(provider, 'getRawTransaction').mockImplementation(
+            (hash: string) => {
+                return Promise.resolve(rawTransactions.get(hash));
+            },
+        );
     });
 
     it('should process each transaction of a block appropriately', async () => {

@@ -1,5 +1,4 @@
 import { ConfigService } from '@nestjs/config';
-import * as Client from 'bitcoin-core';
 import { BitcoinCoreConfig } from '@/configuration.model';
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { BitcoinNetwork } from '@/common/enum';
@@ -20,7 +19,9 @@ import {
     Input,
     isCoinbaseInput,
     Output,
+    RPCRequestBody,
 } from '@/block-data-providers/bitcoin-core/interfaces';
+import axios from 'axios';
 
 @Injectable()
 export class BitcoinCoreProvider
@@ -30,6 +31,7 @@ export class BitcoinCoreProvider
     protected readonly logger = new Logger(BitcoinCoreProvider.name);
     protected readonly operationStateKey = 'bitcoincore-operation-state';
     private isSyncing = false;
+    private config: BitcoinCoreConfig;
 
     public client: Client;
 
@@ -39,30 +41,7 @@ export class BitcoinCoreProvider
         operationStateService: OperationStateService,
     ) {
         super(indexerService, operationStateService);
-        this.initializeClient();
-    }
-
-    initializeClient() {
-        let network: string;
-        switch (this.configService.get<BitcoinNetwork>('app.network')) {
-            case BitcoinNetwork.TESTNET:
-                network = 'testnet';
-                break;
-            case BitcoinNetwork.REGTEST:
-                network = 'regtest';
-                break;
-            case BitcoinNetwork.MAINNET:
-            default:
-                network = 'mainnet';
-        }
-        const config = this.configService.get<BitcoinCoreConfig>('bitcoinCore');
-        this.client = new Client({
-            network,
-            host: config.rpcHost,
-            password: config.rpcPass,
-            port: config.rpcPort,
-            username: config.rpcUser,
-        });
+        this.config = this.configService.get<BitcoinCoreConfig>('bitcoinCore');
     }
 
     async onApplicationBootstrap() {
@@ -125,39 +104,59 @@ export class BitcoinCoreProvider
         this.isSyncing = false;
     }
 
-    protected async getTipHeight(): Promise<number> {
+    async getTipHeight(): Promise<number> {
         try {
-            return await this.client.getBlockCount();
+            const body = {
+                method: 'getblockcount',
+                params: [],
+                ...this.createPartialRPCBody(),
+            };
+            return await this.request(body);
         } catch (error) {
             this.logger.log(`Error fetching block count`);
             throw error;
         }
     }
 
-    protected async getBlockHash(height: number): Promise<string> {
+    async getBlockHash(height: number): Promise<string> {
         try {
-            return await this.client.getBlockHash(height);
+            const body = {
+                method: 'getblockhash',
+                params: [height],
+                ...this.createPartialRPCBody(),
+            };
+            return await this.request(body);
         } catch (error) {
             this.logger.log(`Error fetching  block hash of height : ${height}`);
             throw error;
         }
     }
 
-    protected async getBlock(hash: string, verbosity: number): Promise<Block> {
+    async getBlock(hash: string, verbosity: number): Promise<Block> {
         try {
-            return await this.client.getBlock(hash, verbosity);
+            const body = {
+                method: 'getblock',
+                params: [hash, verbosity],
+                ...this.createPartialRPCBody(),
+            };
+            return await this.request(body);
         } catch (error) {
             this.logger.log(`Error fetching block with block hash : ${hash}`);
             throw error;
         }
     }
 
-    protected async getRawTransaction(
+    async getRawTransaction(
         txid: string,
         isVerbose: boolean,
     ): Promise<BlockTransaction> {
         try {
-            return await this.client.getRawTransaction(txid, isVerbose);
+            const body = {
+                method: 'getrawtransaction',
+                params: [txid, isVerbose],
+                ...this.createPartialRPCBody(),
+            };
+            return await this.request(body);
         } catch (error) {
             this.logger.log(
                 `Error fetching transaction with transaction id : ${txid}`,
@@ -243,6 +242,37 @@ export class BitcoinCoreProvider
         return {
             scriptPubKey: txnOutput.scriptPubKey.hex,
             value: txnOutput.value,
+        };
+    }
+
+    async request(body: RPCRequestBody): Promise<any> {
+        const { rpcUser, rpcPass, rpcPort, rpcHost } = this.config;
+        try {
+            const response = await axios.post(
+                `http://${rpcHost}:${rpcPort}/`,
+                body,
+                {
+                    auth: {
+                        username: rpcUser,
+                        password: rpcPass,
+                    },
+                },
+            );
+            return response.data.result;
+        } catch (error) {
+            this.logger.error(
+                `Request to BitcoinCore failed!\nRequest:\n${JSON.stringify(
+                    body,
+                )}\nError:\n${error.message}`,
+            );
+            throw error;
+        }
+    }
+
+    createPartialRPCBody(): Pick<RPCRequestBody, 'jsonrpc' | 'id'> {
+        return {
+            jsonrpc: '1.0',
+            id: 'silent_payment_indexer',
         };
     }
 }

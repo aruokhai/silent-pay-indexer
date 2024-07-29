@@ -35,7 +35,6 @@
     "@nestjs/typeorm": "^10.0.2",
     "@nestjs/websockets": "^10.3.7",
     "axios": "^1.7.2",
-    "bitcoin-core": "^4.2.0",
     "js-yaml": "^4.1.0",
     "pg": "^8.11.5",
     "reflect-metadata": "^0.1.13",

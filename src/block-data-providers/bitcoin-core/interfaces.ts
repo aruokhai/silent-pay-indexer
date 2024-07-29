@@ -53,3 +53,10 @@ export type Transaction = {
     blockHeight: number;
     blockHash: string;
 };
+
+export interface RPCRequestBody {
+    jsonrpc: string;
+    method: string;
+    id: string;
+    params: unknown[];
+}
