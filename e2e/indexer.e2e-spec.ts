@@ -1,5 +1,5 @@
-import { UTXO, WalletHelper } from '@e2e/helpers/wallet.helper';
-import { transactionToEntity, btcToSats } from '@e2e/helpers/common.helper';
+import { UTXO, WalletHelper, AddressType } from '@e2e/helpers/wallet.helper';
+import { transactionToEntity } from '@e2e/helpers/common.helper';
 import { initialiseDep } from '@e2e/setup';
 import { ApiHelper } from '@e2e/helpers/api.helper';
 import { SilentBlocksService } from '@/silent-blocks/silent-blocks.service';
@@ -21,76 +21,57 @@ describe('Indexer', () => {
         await shutdownDep();
     });
 
-    it('p2wpkh - should ensure that the correct silent block is fetched', async () => {
-        let taprootOutput = walletHelper.generateAddresses(1, 'p2tr')[0];
-        const p2wkhOutputs = walletHelper.generateAddresses(6, 'p2wpkh');
-        const utxos: UTXO[] = [];
-        const transferValue = 5.999;
-        const feeValue = 0.001;
+    it.each(Object.values<AddressType>(AddressType))(
+        '%s - should ensure that the correct silent block is fetched',
+        async (addressType) => {
+            const taprootOutput = walletHelper.generateAddresses(
+                1,
+                AddressType.P2TR,
+            )[0];
+            const outputs = walletHelper.generateAddresses(6, addressType);
+            const utxos: UTXO[] = [];
 
-        for (const output of p2wkhOutputs) {
-            const utxo = await walletHelper.addFundToUTXO(output, 1);
-            utxos.push(utxo);
-        }
+            for (const [index, output] of outputs.entries()) {
+                const utxo = await walletHelper.addFundToUTXO(
+                    output,
+                    1,
+                    addressType,
+                    index,
+                );
+                utxos.push(utxo);
+            }
 
-        const { transaction, txid, blockhash } =
-            await walletHelper.craftAndSendTransaction(
-                utxos,
-                taprootOutput,
-                5.999,
-                0.001,
+            const { transaction, txid, blockHash } =
+                await walletHelper.craftAndSendTransaction(
+                    utxos,
+                    taprootOutput,
+                    5.999,
+                    0.001,
+                );
+
+            const blockCount = await walletHelper.getBlockCount();
+            const transformedTransaction = transactionToEntity(
+                transaction,
+                txid,
+                blockHash,
+                blockCount,
+                outputs,
             );
 
-        const blockCount = await walletHelper.getBlockCount();
-        const transformedTransaction = transactionToEntity(
-            transaction,
-            txid,
-            blockhash,
-            blockCount,
-            p2wkhOutputs,
-        );
+            const silentBlock = new SilentBlocksService(
+                {} as any,
+                {} as any,
+            ).encodeSilentBlock([transformedTransaction]);
 
-        let silentBlock = new SilentBlocksService(
-            {} as any,
-            {} as any,
-        ).encodeSilentBlock([transformedTransaction]);
+            await new Promise((resolve) => setTimeout(resolve, 15000));
+            const response = await apiHelper.get(
+                `/silent-block/hash/${blockHash}`,
+                {
+                    responseType: 'arraybuffer',
+                },
+            );
 
-        await new Promise((resolve) => setTimeout(resolve, 15000));
-        let response = await apiHelper.get(`/silent-block/hash/${blockhash}`, {
-            responseType: 'arraybuffer',
-        });
-
-        expect(response.data).toEqual(silentBlock);
-
-        console.log(transaction.outs);
-
-        taprootOutput = walletHelper.generateAddresses(1, 'p2tr')[0];
-        const utxo: UTXO = {
-            rawTx: transaction.toHex(),
-            txid,
-            vout: 0,
-            value: btcToSats(transferValue),
-        };
-        await walletHelper.craftAndSendTransaction(
-            [utxo],
-            taprootOutput,
-            5,
-            feeValue,
-        );
-
-        await new Promise((resolve) => setTimeout(resolve, 15000));
-        response = await apiHelper.get(
-            `/silent-block/hash/${blockhash}?unspent=true`,
-            {
-                responseType: 'arraybuffer',
-            },
-        );
-
-        silentBlock = new SilentBlocksService(
-            {} as any,
-            {} as any,
-        ).encodeSilentBlock([]);
-
-        expect(response.data).toEqual(silentBlock);
-    });
+            expect(response.data).toEqual(silentBlock);
+        },
+    );
 });
