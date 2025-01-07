@@ -10,8 +10,7 @@ import { OperationStateModule } from '@/operation-state/operation-state.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BlockProviderModule } from '@/block-data-providers/block-provider.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { TransactionOutputService } from './transaction-output/transaction-output.service';
-import { TransactionOutputModule } from './transaction-output/transaction-output.module';
+import { TransactionOutputModule } from '@/transaction-output/transaction-output.module';
 
 @Module({
     imports: [
@@ -39,6 +38,6 @@ import { TransactionOutputModule } from './transaction-output/transaction-output
         TransactionOutputModule,
     ],
     controllers: [AppController],
-    providers: [AppService, TransactionOutputService],
+    providers: [AppService],
 })
 export class AppModule {}

@@ -1,5 +1,5 @@
 import { Transaction } from '@/transactions/transaction.entity';
-import { Outpoint, TransactionOutput as TransactionOutputEntity } from '@/transaction-output/transaction-output.entity';
+import { TransactionOutput as TransactionOutputEntity } from '@/transaction-output/transaction-output.entity';
 import { createTaggedHash, extractPubKeyFromScript } from '@/common/common';
 import { publicKeyCombine, publicKeyTweakMul } from 'secp256k1';
 import { Injectable } from '@nestjs/common';
@@ -28,6 +28,8 @@ export class IndexerService {
         blockHash: string,
         manager: EntityManager,
     ): Promise<void> {
+        await this.markOutputsAsSpent(manager, vin);
+
         const scanResult = this.deriveOutputsAndComputeScanTweak(vin, vout);
         if (scanResult !== null) {
             const [scanTweak, eligibleOutputs] = scanResult;
@@ -38,8 +40,9 @@ export class IndexerService {
             transaction.scanTweak = scanTweak.toString('hex');
             transaction.outputs = eligibleOutputs;
 
+            console.log(transaction);
+
             await manager.save(Transaction, transaction);
-            await this.markOutputsAsSpent(manager, vin);
         }
     }
 

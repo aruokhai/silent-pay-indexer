@@ -17,7 +17,7 @@ export class TransactionsService {
     }
 
     async getTransactionByBlockHash(blockHash: string): Promise<Transaction[]> {
-        return this.transactionRepository.find({ where: { blockHash } });
+        return this.transactionRepository.find({ where: { blockHash }, relations: { outputs: true} });
     }
 
     async saveTransaction(transaction: Transaction): Promise<Transaction> {

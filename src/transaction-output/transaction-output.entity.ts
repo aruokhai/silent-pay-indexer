@@ -15,7 +15,7 @@ export class TransactionOutput {
     @Column({ type: 'integer', nullable: false })
     value: number; // Value of the output (use bigint for large amounts)
 
-    @Column({ type: 'boolean', nullable: false })
+    @Column({ type: 'boolean', nullable: false, default: false })
     isSpent: boolean;
 
     @ManyToOne(() => Transaction, (transaction) => transaction.outputs, {

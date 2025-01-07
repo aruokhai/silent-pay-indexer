@@ -62,6 +62,7 @@ export class SilentBlocksService {
             await this.transactionsService.getTransactionByBlockHeight(
                 blockHeight,
             );
+        console.log("outputs length", transactions[0]);
         return this.encodeSilentBlock(transactions);
     }
 
@@ -71,6 +72,8 @@ export class SilentBlocksService {
     ): Promise<Buffer> {
         let transactions =
             await this.transactionsService.getTransactionByBlockHash(blockHash);
+
+        console.log("outputs length", transactions[0]);
 
         if (unspentFlag) {
             transactions = transactions.filter((transaction) =>
