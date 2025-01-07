@@ -65,9 +65,19 @@ export class SilentBlocksService {
         return this.encodeSilentBlock(transactions);
     }
 
-    async getSilentBlockByHash(blockHash: string): Promise<Buffer> {
-        const transactions =
+    async getSilentBlockByHash(
+        blockHash: string,
+        unspentFlag: boolean,
+    ): Promise<Buffer> {
+        let transactions =
             await this.transactionsService.getTransactionByBlockHash(blockHash);
+
+        if (unspentFlag) {
+            transactions = transactions.filter((transaction) =>
+                transaction.outputs.every((output) => output.isSpent),
+            );
+        }
+
         return this.encodeSilentBlock(transactions);
     }
 }
