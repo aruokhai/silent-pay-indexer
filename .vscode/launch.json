@@ -4,13 +4,13 @@
       {
         "type": "node",
         "request": "launch",
-        "name": "Launch via NPM",
+        "name": "Debug e2e Test",
         "runtimeExecutable": "npm",
         "runtimeArgs": [
           "run",
-          "test:e2e",        // Replace "start" with your script name
+          "test:e2e",        
           "--",
-          "--inspect-brk" // Enable debugging and break at start
+          "--inspect-brk"
         ],
         "port": 9229,
         "console": "integratedTerminal"

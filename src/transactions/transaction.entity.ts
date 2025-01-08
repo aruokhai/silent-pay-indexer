@@ -1,4 +1,4 @@
-import { TransactionOutput } from '@/transaction-output/transaction-output.entity';
+import { TransactionOutput } from '@/transactions/transaction-output.entity';
 import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 
 @Entity()

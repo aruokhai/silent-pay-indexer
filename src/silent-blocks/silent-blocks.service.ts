@@ -62,22 +62,20 @@ export class SilentBlocksService {
             await this.transactionsService.getTransactionByBlockHeight(
                 blockHeight,
             );
-        console.log("outputs length", transactions[0]);
+
         return this.encodeSilentBlock(transactions);
     }
 
     async getSilentBlockByHash(
         blockHash: string,
-        unspentFlag: boolean,
+        filterSpent: boolean,
     ): Promise<Buffer> {
         let transactions =
             await this.transactionsService.getTransactionByBlockHash(blockHash);
 
-        console.log("outputs length", transactions[0]);
-
-        if (unspentFlag) {
+        if (filterSpent) {
             transactions = transactions.filter((transaction) =>
-                transaction.outputs.every((output) => output.isSpent),
+                transaction.outputs.some((output) => !output.isSpent),
             );
         }
 

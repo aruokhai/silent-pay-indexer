@@ -25,15 +25,15 @@ export class SilentBlocksController {
     @Get('hash/:blockHash')
     async getSilentBlockByHash(
         @Param('blockHash') blockHash: string,
-        @Query('unspent') unspent = 'false',
+        @Query('filterSpent') filterSpentFlag = 'false',
         @Res() res: Response,
     ) {
-        // Convert unspent to boolean
-        const unspentFlag = unspent === 'true';
+        // Convert  to boolean
+        const filterSpent = filterSpentFlag === 'true';
 
         const buffer = await this.silentBlocksService.getSilentBlockByHash(
             blockHash,
-            unspentFlag,
+            filterSpent,
         );
 
         res.set({

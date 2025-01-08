@@ -4,7 +4,10 @@ import { SilentBlocksService } from '@/silent-blocks/silent-blocks.service';
 import { silentBlockEncodingFixture } from '@/silent-blocks/silent-blocks.service.fixtures';
 import { SilentBlocksGateway } from '@/silent-blocks/silent-blocks.gateway';
 import { DataSource, Repository } from 'typeorm';
-import { Transaction } from '@/transactions/transaction.entity';
+import {
+    Transaction,
+    TransactionOutput,
+} from '@/transactions/transaction.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 
 describe('SilentBlocksService', () => {
@@ -17,7 +20,7 @@ describe('SilentBlocksService', () => {
             type: 'sqlite',
             database: ':memory:',
             dropSchema: true,
-            entities: [Transaction],
+            entities: [Transaction, TransactionOutput],
             synchronize: true,
             logging: false,
         });
@@ -64,7 +67,10 @@ describe('SilentBlocksService', () => {
         async ({ transactions, blockHash, encodedBlockHex }) => {
             await transactionRepository.save(transactions);
 
-            const encodedBlock = await service.getSilentBlockByHash(blockHash);
+            const encodedBlock = await service.getSilentBlockByHash(
+                blockHash,
+                false,
+            );
 
             expect(encodedBlock.toString('hex')).toEqual(encodedBlockHex);
         },

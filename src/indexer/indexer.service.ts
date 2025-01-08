@@ -1,5 +1,5 @@
 import { Transaction } from '@/transactions/transaction.entity';
-import { TransactionOutput as TransactionOutputEntity } from '@/transaction-output/transaction-output.entity';
+import { TransactionOutput as TransactionOutputEntity } from '@/transactions/transaction-output.entity';
 import { createTaggedHash, extractPubKeyFromScript } from '@/common/common';
 import { publicKeyCombine, publicKeyTweakMul } from 'secp256k1';
 import { Injectable } from '@nestjs/common';
@@ -40,8 +40,6 @@ export class IndexerService {
             transaction.scanTweak = scanTweak.toString('hex');
             transaction.outputs = eligibleOutputs;
 
-            console.log(transaction);
-
             await manager.save(Transaction, transaction);
         }
     }
@@ -57,13 +55,17 @@ export class IndexerService {
             })),
         });
 
+        if (outputs.length == 0) {
+            return;
+        }
+
         // Mark each output as spent
         const spentOutputs = outputs.map((output) => ({
             ...output,
             isSpent: true,
         }));
 
-        await manager.save(spentOutputs);
+        await manager.save(TransactionOutputEntity, spentOutputs);
     }
 
     public deriveOutputsAndComputeScanTweak(
